@@ -1,0 +1,29 @@
+package service
+
+import (
+	"database/sql"
+	"errors"
+
+	"github.com/nicholasrussel/myapp/config"
+	"github.com/nicholasrussel/myapp/internal/model"
+	"golang.org/x/crypto/bcrypt"
+)
+
+func Login(email, password string) (*model.User, error) {
+	var user model.User
+	err := config.DB.QueryRow("SELECT id, username, email, password, user_type FROM users WHERE email = ?", email).
+			Scan(&user.ID, &user.Username, &user.Email, &user.Password, &user.UserType)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.New("Email not found")
+	} else if err != nil {
+		return nil, err
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	if err != nil {
+		return nil, errors.New("Password salah")
+	}
+
+	return &user, nil
+}
