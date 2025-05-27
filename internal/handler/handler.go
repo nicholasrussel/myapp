@@ -1,11 +1,10 @@
 package handler
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
-	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/nicholasrussel/myapp/config"
 	"github.com/nicholasrussel/myapp/internal/handler/dto"
@@ -13,106 +12,84 @@ import (
 	"github.com/nicholasrussel/myapp/internal/service"
 )
 
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
+func LoginHandler(c *gin.Context) {
 	log.Println("LoginHandler dipanggil")
+
 	var req dto.LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Bad Request"})
 		return
 	}
 
 	user, err := service.Login(req.Email, req.Password)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
 	token, err := service.GenerateToken(user.ID, user.Username, user.UserType)
 	if err != nil {
-		http.Error(w, "Gagal membuat token", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat token"})
 		return
 	}
 
 	// Set cookie khusus untuk Web
-	http.SetCookie(w, &http.Cookie{
-		Name:     service.TokenName,
-		Value:    token,
-		Expires:  time.Now().Add(1 * time.Minute),
-		Secure:   true,
-		HttpOnly: true,
-	})
+	c.SetCookie(service.TokenName, token, 60 /* detik */, "/", "", true, true)
 
-	// Buat refresh token
 	refreshToken, err := service.GenerateRefreshToken(user.ID)
 	if err != nil {
-		http.Error(w, "Gagal membuat refresh token", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat refresh token"})
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refreshToken",
-		Value:    refreshToken,
-		Expires:  time.Now().Add(1 * time.Minute),
-		Secure:   true,
-		HttpOnly: true,
-	})
-	
+	c.SetCookie(service.RefreshTokenName, refreshToken, 60 /* detik */, "/", "", true, true)
 
 	// Return response untuk mobile juga
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"user":  user,
-		"token": token,
+	c.JSON(http.StatusOK, gin.H{
+		"user":         user,
+		"token":        token,
 		"refreshToken": refreshToken,
 	})
 }
 
-func RefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie("refreshToken")
+func RefreshTokenHandler(c *gin.Context) {
+	refreshToken, err := c.Cookie("refreshToken")
 	if err != nil {
-		http.Error(w, "Refresh token tidak ditemukan", http.StatusUnauthorized)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Refresh token tidak ditemukan"})
 		return
 	}
 
-	tokenStr := cookie.Value
 	jwtKey := []byte(config.LoadEnv("JWT_REFRESH_KEY"))
 	claims := &model.JWTClaims{}
 
-	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(refreshToken, claims, func(token *jwt.Token) (interface{}, error) {
 		return jwtKey, nil
 	})
 
 	if err != nil || !token.Valid {
-		http.Error(w, "Refresh token tidak valid", http.StatusUnauthorized)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Refresh token tidak valid"})
 		return
 	}
 
-	// Buat access token baru
 	newAccessToken, err := service.GenerateToken(claims.ID, claims.Username, claims.UserType)
 	if err != nil {
-		http.Error(w, "Gagal buat access token", http.StatusInternalServerError)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal buat access token"})
 		return
 	}
 
-	// Set cookie baru (jika dari browser)
-	http.SetCookie(w, &http.Cookie{
-		Name:     service.TokenName,
-		Value:    newAccessToken,
-		Expires:  time.Now().Add(60 * time.Minute),
-		Secure:   true,
-		HttpOnly: true,
-	})
+	c.SetCookie(service.TokenName, newAccessToken, 3600 /* detik */, "/", "", true, true)
 
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	c.JSON(http.StatusOK, gin.H{
 		"token": newAccessToken,
 	})
 }
 
-func CheckLoginHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Selamat datang, user premium!"))
+func CheckLoginHandler(c *gin.Context) {
+	c.String(http.StatusOK, "Selamat datang, user premium!")
 }
 
-func Logout(w http.ResponseWriter, r *http.Request) {
-
-	service.ResetUserToken(w)
-	log.Println("(SUCCESS)\t", "Logout request")
+func Logout(c *gin.Context) {
+	service.ResetUserToken(c)
+	log.Println("(SUCCESS)\t Logout request")
 }
+

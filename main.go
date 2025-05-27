@@ -3,9 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
 
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/nicholasrussel/myapp/config"
 	"github.com/nicholasrussel/myapp/internal/handler"
@@ -15,7 +14,7 @@ import (
 func main() {
 	fmt.Println("Hello, Go!")
 
-
+	// Load .env
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Gagal load file .env")
@@ -24,21 +23,21 @@ func main() {
 	// Init DB
 	config.InitDB()
 	log.Println("✅ Koneksi ke database berhasil!")
+
+	// Inisialisasi Gin router
+	router := gin.Default()
+
+	// Routes
 	log.Println("Mendaftarkan endpoint /login")
-	
-	router := mux.NewRouter()
 
-	router.HandleFunc("/login", handler.LoginHandler).Methods("POST")
-	router.HandleFunc("/check-login", service.Authenticate(handler.CheckLoginHandler, 1)).Methods("GET")
-	router.HandleFunc("/refresh", handler.RefreshTokenHandler).Methods("POST")
+	router.POST("/login", handler.LoginHandler)
+	router.GET("/check-login", service.Authenticate(handler.CheckLoginHandler, 1))
+	router.POST("/refresh", handler.RefreshTokenHandler)
+	router.GET("/logout", handler.Logout)
 
-	
-	router.HandleFunc("/logout", handler.Logout).Methods("GET")
-
-	log.Println("Endpoint /login terdaftar")
+	// Jalankan server
 	svrPort := config.LoadEnv("SVR_PORT")
 	log.Println("Connected to port " + svrPort)
-	addr := ":" + svrPort
-	http.ListenAndServe(addr, router)
+	router.Run(":" + svrPort)
 }
 
