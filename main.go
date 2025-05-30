@@ -30,7 +30,7 @@ func main() {
 	// Routes
 	log.Println("Mendaftarkan endpoint /login")
 
-	router.POST("/login", handler.LoginHandler)
+	router.POST("/login", service.RateLimitLoginMiddleware(), handler.LoginHandler)
 	router.GET("/check-login", service.Authenticate(handler.CheckLoginHandler, 1))
 	router.POST("/refresh", handler.RefreshTokenHandler)
 	router.GET("/logout", handler.Logout)

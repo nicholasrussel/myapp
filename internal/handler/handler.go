@@ -21,30 +21,40 @@ func LoginHandler(c *gin.Context) {
 		return
 	}
 
+	// Cek rate limit login gagal per email
+	if service.IsLoginFailureLimited(req.Email, c) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Terlalu banyak login gagal. Coba lagi nanti."})
+		return
+	}
+
+	// Coba login
 	user, err := service.Login(req.Email, req.Password)
 	if err != nil {
+		// Jika gagal, catat sebagai login gagal
+		service.MarkLoginFailure(req.Email, c)
+
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Jika berhasil login, buat token
 	token, err := service.GenerateToken(user.ID, user.Username, user.UserType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat token"})
 		return
 	}
 
-	// Set cookie khusus untuk Web
-	c.SetCookie(service.TokenName, token, 60 /* detik */, "/", "", true, true)
+	// Set cookie untuk Web
+	c.SetCookie(service.TokenName, token, 60, "/", "", true, true)
 
+	// Generate refresh token
 	refreshToken, err := service.GenerateRefreshToken(user.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat refresh token"})
 		return
 	}
+	c.SetCookie(service.RefreshTokenName, refreshToken, 60, "/", "", true, true)
 
-	c.SetCookie(service.RefreshTokenName, refreshToken, 60 /* detik */, "/", "", true, true)
-
-	// Return response untuk mobile juga
 	c.JSON(http.StatusOK, gin.H{
 		"user":         user,
 		"token":        token,
