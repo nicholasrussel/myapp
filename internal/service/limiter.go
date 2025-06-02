@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	globalLimiter   = createLimiter("20-M") // 20 requests per minute per IP
+	globalLimiter   = createLimiter("10-M") // 10 requests per minute per IP
 	emailLimiter    = createLimiter("5-M")  // 5 requests per minute per email
 	failureLimiter  = createLimiter("3-M")  // 3 failed logins per minute per email
 )

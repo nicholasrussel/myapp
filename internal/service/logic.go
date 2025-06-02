@@ -3,6 +3,7 @@ package service
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/nicholasrussel/myapp/config"
 	"github.com/nicholasrussel/myapp/internal/model"
@@ -26,4 +27,31 @@ func Login(email, password string) (*model.User, error) {
 	}
 
 	return &user, nil
+}
+
+func Register(username, email, password string) error {
+	// Cek duplikat email
+	var exists int
+	err := config.DB.QueryRow("SELECT COUNT(*) FROM users WHERE email = ?", email).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("Gagal memeriksa email")
+	}
+	if exists > 0 {
+		return fmt.Errorf("Email sudah terdaftar")
+	}
+
+	// Hash password
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("Gagal meng-hash password")
+	}
+
+	// Simpan user
+	_, err = config.DB.Exec(`INSERT INTO users (username, email, password, user_type) VALUES (?, ?, ?, 0)`,
+		username, email, hashed)
+	if err != nil {
+		return fmt.Errorf("Gagal menyimpan user")
+	}
+
+	return nil
 }

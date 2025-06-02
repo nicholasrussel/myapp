@@ -33,6 +33,8 @@ func main() {
 	router.POST("/login", service.RateLimitLoginMiddleware(), handler.LoginHandler)
 	router.GET("/check-login", service.Authenticate(handler.CheckLoginHandler, 1))
 	router.POST("/refresh", handler.RefreshTokenHandler)
+
+	router.POST("/register", handler.RegisterHandler)
 	router.GET("/logout", handler.Logout)
 
 	// Jalankan server
