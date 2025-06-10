@@ -12,7 +12,9 @@ services:
       - DB_PASS=password
       - DB_NAME=myapp
       - SVR_PORT=8080 
-
+    volumes:
+      - ./internal/email:/app/internal/email
+      
   db:
     image: mysql:8.0
     restart: always

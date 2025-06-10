@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Simple Chat</title>
+</head>
+<body>
+  <h2>Simple WebSocket Chat</h2>
+  <div>
+    <label>Your User ID: <input type="text" id="userID" /></label>
+    <button onclick="connect()">Connect</button>
+  </div>
+
+  <div style="margin-top: 20px;">
+    <label>To User ID: <input type="text" id="receiverID" onchange="loadMessages()" /></label><br>
+    <label>Message: <input type="text" id="message" /></label>
+    <button onclick="sendMessage()">Send</button>
+  </div>
+
+  <div style="margin-top: 20px;">
+    <h3>Messages:</h3>
+    <div id="chatBox" style="border:1px solid #ccc; padding:10px; height:200px; overflow:auto;"></div>
+  </div>
+
+  <script>
+    let socket = null;
+    let userID = null;
+
+    function connect() {
+      userID = document.getElementById("userID").value;
+      if (!userID) return alert("Enter your User ID");
+
+      socket = new WebSocket(`ws://localhost:8080/ws?user_id=${userID}`);
+
+      socket.onopen = () => {
+        logMessage("Connected as User ID " + userID);
+      };
+
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        const sender = data.sender_id === parseInt(userID) ? "You" : `From ${data.sender_id}`;
+        logMessage(`${sender}: ${data.content}`);
+      };
+
+      socket.onclose = () => {
+        logMessage("Disconnected.");
+      };
+
+      socket.onerror = (err) => {
+        console.error("WebSocket error:", err);
+      };
+    }
+
+    function sendMessage() {
+      const receiverID = document.getElementById("receiverID").value;
+      const message = document.getElementById("message").value;
+      if (!receiverID || !message) return alert("Receiver ID and message are required");
+
+      const payload = {
+        sender_id: parseInt(userID),
+        receiver_id: parseInt(receiverID),
+        content: message
+      };
+
+      socket.send(JSON.stringify(payload));
+      logMessage(`You to ${receiverID}: ${message}`);
+      document.getElementById("message").value = "";
+    }
+
+    function loadMessages() {
+      const user1 = userID;
+      const user2 = document.getElementById("receiverID").value;
+      if (!user1 || !user2) return;
+
+      fetch(`http://localhost:8080/messages?user1=${user1}&user2=${user2}`)
+        .then(res => res.json())
+        .then(messages => {
+          const box = document.getElementById("chatBox");
+          box.innerHTML = "";
+          messages.forEach(msg => {
+            const sender = msg.sender_id === parseInt(userID) ? "You" : `From ${msg.sender_id}`;
+            box.innerHTML += `<div>${sender}: ${msg.content}</div>`;
+          });
+          box.scrollTop = box.scrollHeight;
+        })
+        .catch(err => {
+          console.error("Failed to load messages:", err);
+        });
+    }
+
+    function logMessage(msg) {
+      const box = document.getElementById("chatBox");
+      box.innerHTML += `<div>${msg}</div>`;
+      box.scrollTop = box.scrollHeight;
+    }
+  </script>
+</body>
+</html>

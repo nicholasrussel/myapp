@@ -1,0 +1,11 @@
+{
+    "installed": {
+        "client_id":"1065304730449-u7gbbn14gitstngto5685aqmglfk7g3k.apps.googleusercontent.com",
+        "project_id":"my-project-go-462002",
+        "auth_uri":"https://accounts.google.com/o/oauth2/auth",
+        "token_uri":"https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs",
+        "client_secret":"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",
+        "redirect_uris":["http://localhost:8080"]
+    }
+}
