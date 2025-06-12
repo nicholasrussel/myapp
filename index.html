@@ -12,6 +12,7 @@
 
   <div style="margin-top: 20px;">
     <label>To User ID: <input type="text" id="receiverID" onchange="loadMessages()" /></label><br>
+    <label>To Group ID: <input type="text" id="groupID" onchange="loadGroupMessages()" /></label><br>
     <label>Message: <input type="text" id="message" /></label>
     <button onclick="sendMessage()">Send</button>
   </div>
@@ -37,9 +38,17 @@
 
       socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        const sender = data.sender_id === parseInt(userID) ? "You" : `From ${data.sender_id}`;
-        logMessage(`${sender}: ${data.content}`);
+        let prefix = "";
+
+        if (data.group_id) {
+          prefix = `Group ${data.group_id} - `;
+        } else {
+          prefix = data.sender_id === parseInt(userID) ? "You" : `From ${data.sender_id}`;
+        }
+
+        logMessage(`${prefix}: ${data.content}`);
       };
+
 
       socket.onclose = () => {
         logMessage("Disconnected.");
@@ -52,19 +61,30 @@
 
     function sendMessage() {
       const receiverID = document.getElementById("receiverID").value;
+      const groupID = document.getElementById("groupID").value;
       const message = document.getElementById("message").value;
-      if (!receiverID || !message) return alert("Receiver ID and message are required");
+
+      if (!message) return alert("Message is required");
 
       const payload = {
         sender_id: parseInt(userID),
-        receiver_id: parseInt(receiverID),
         content: message
       };
 
+      if (groupID) {
+        payload.group_id = parseInt(groupID);
+        logMessage(`You to Group ${groupID}: ${message}`);
+      } else if (receiverID) {
+        payload.receiver_id = parseInt(receiverID);
+        logMessage(`You to ${receiverID}: ${message}`);
+      } else {
+        return alert("Provide either Receiver ID or Group ID");
+      }
+
       socket.send(JSON.stringify(payload));
-      logMessage(`You to ${receiverID}: ${message}`);
       document.getElementById("message").value = "";
     }
+
 
     function loadMessages() {
       const user1 = userID;
@@ -72,6 +92,27 @@
       if (!user1 || !user2) return;
 
       fetch(`http://localhost:8080/messages?user1=${user1}&user2=${user2}`)
+        .then(res => res.json())
+        .then(messages => {
+          const box = document.getElementById("chatBox");
+          box.innerHTML = "";
+          messages.forEach(msg => {
+            const sender = msg.sender_id === parseInt(userID) ? "You" : `From ${msg.sender_id}`;
+            box.innerHTML += `<div>${sender}: ${msg.content}</div>`;
+          });
+          box.scrollTop = box.scrollHeight;
+        })
+        .catch(err => {
+          console.error("Failed to load messages:", err);
+        });
+    }
+
+    function loadGroupMessages() {
+      const user1 = userID;
+      const group = document.getElementById("groupID").value;
+      if (!group) return;
+
+      fetch(`http://localhost:8080/group-messages?group=${group}`)
         .then(res => res.json())
         .then(messages => {
           const box = document.getElementById("chatBox");

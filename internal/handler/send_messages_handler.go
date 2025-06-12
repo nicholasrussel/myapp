@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -16,12 +17,22 @@ func SendMessageHandler(c *gin.Context) {
 		return
 	}
 
-	err := service.SaveMessage(msg.SenderID, msg.ReceiverID, msg.Content)
+	var err error
+	if msg.GroupID != 0 {
+		log.Println("masuk if group id ada nilai:")
+		err = service.SaveGroupMessage(msg.SenderID, msg.GroupID, msg.Content)
+	} else {
+		log.Println("masuk if chat personal:")
+		err = service.SaveMessage(msg.SenderID, msg.ReceiverID, msg.Content)
+	}
+
 	if err != nil {
+		log.Println("send messages error:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Message sent successfully"})
 }
+
 

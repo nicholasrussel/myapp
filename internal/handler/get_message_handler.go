@@ -33,3 +33,23 @@ func GetMessagesHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, messages)
 }
+
+func GetGroupMessagesHandler(c *gin.Context) {
+	groupStr := c.Query("group")
+
+	group, err := strconv.Atoi(groupStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user1 parameter"})
+		return
+	}
+
+
+	messages, err := service.GetGroupMessages(group)
+	if err != nil {
+		log.Println("DB error:", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get messages"})
+		return
+	}
+
+	c.JSON(http.StatusOK, messages)
+}

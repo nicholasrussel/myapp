@@ -51,6 +51,9 @@ func main() {
 
 	router.POST("/messages", handler.SendMessageHandler)
 	router.GET("/messages", handler.GetMessagesHandler)
+	router.GET("/group-messages", handler.GetGroupMessagesHandler)
+
+	router.POST("/create-group", handler.CreateGroupHandler)
 
 	// Jalankan server
 	svrPort := config.LoadEnv("SVR_PORT")

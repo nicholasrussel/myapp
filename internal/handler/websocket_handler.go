@@ -12,20 +12,18 @@ import (
 	"github.com/nicholasrussel/myapp/internal/service"
 )
 
-// Client represents a connected WebSocket client
 type Client struct {
 	conn   *websocket.Conn
 	userID string
 }
 
 var (
-	clients = make(map[string]*Client) // map userID to Client
-	lock    sync.Mutex
+	clients  = make(map[string]*Client)
+	lock     sync.Mutex
 	upgrader = websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool { return true }, // allow all origins
+		CheckOrigin: func(r *http.Request) bool { return true },
 	}
 )
-
 
 func WebSocketHandler(c *gin.Context) {
 	userID := c.Query("user_id")
@@ -34,7 +32,6 @@ func WebSocketHandler(c *gin.Context) {
 		return
 	}
 
-	// Upgrade HTTP connection to WebSocket
 	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade error: %v", err)
@@ -49,45 +46,69 @@ func WebSocketHandler(c *gin.Context) {
 	}()
 
 	client := &Client{conn: ws, userID: userID}
-
-	// Register client
 	lock.Lock()
 	clients[userID] = client
 	lock.Unlock()
 
 	log.Printf("User %s connected", userID)
 
-	// Read messages loop
 	for {
 		var msg dto.Message
-		err := ws.ReadJSON(&msg)
-		if err != nil {
+		if err := ws.ReadJSON(&msg); err != nil {
 			log.Printf("Read error from user %s: %v", userID, err)
 			break
 		}
+		handleMessage(msg)
+	}
+}
 
-		log.Printf("Received message from %s to %s: %s", msg.SenderID, msg.ReceiverID, msg.Content)
+func handleMessage(msg dto.Message) {
+	if msg.GroupID > 0 {
+		handleGroupMessage(msg)
+	} else {
+		handlePersonalMessage(msg)
+	}
+}
 
-		err = service.SaveMessage(msg.SenderID, msg.ReceiverID, msg.Content)
-		if err != nil {
-			log.Printf("Failed to save message: %v", err)
+func handleGroupMessage(msg dto.Message) {
+	err := service.SaveGroupMessage(msg.SenderID, msg.GroupID, msg.Content)
+	if err != nil {
+		log.Printf("Failed to save group message: %v", err)
+		return
+	}
+
+	memberIDs, err := service.GetGroupMembers(msg.GroupID)
+	if err != nil {
+		log.Printf("Failed to get group members: %v", err)
+		return
+	}
+
+	for _, uid := range memberIDs {
+		if uid != msg.SenderID {
+			sendToClient(uid, msg)
 		}
+	}
+}
 
+func handlePersonalMessage(msg dto.Message) {
+	err := service.SaveMessage(msg.SenderID, msg.ReceiverID, msg.Content)
+	if err != nil {
+		log.Printf("Failed to save personal message: %v", err)
+		return
+	}
+	sendToClient(msg.ReceiverID, msg)
+}
 
+func sendToClient(userID int, msg dto.Message) {
+	uidStr := strconv.Itoa(userID)
+	lock.Lock()
+	receiverClient, ok := clients[uidStr]
+	lock.Unlock()
 
-		// Send message to receiver if online
-		lock.Lock()
-		receiverIDStr := strconv.Itoa(msg.ReceiverID)
-		receiverClient, ok := clients[receiverIDStr]
-		lock.Unlock()
-
-		if ok {
-			err = receiverClient.conn.WriteJSON(msg)
-			if err != nil {
-				log.Printf("Write error to user %s: %v", msg.ReceiverID, err)
-			}
-		} else {
-			log.Printf("User %s is offline, cannot deliver message", msg.ReceiverID)
+	if ok {
+		err := receiverClient.conn.WriteJSON(msg)
+		if err != nil {
+			log.Printf("Write error to user %d: %v", userID, err)
 		}
 	}
 }
