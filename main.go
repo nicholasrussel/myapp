@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 
-	// Tambahkan ini
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/nicholasrussel/myapp/config"
@@ -27,6 +26,9 @@ func main() {
 	// Init DB
 	config.InitDB()
 	log.Println("✅ Koneksi ke database berhasil!")
+
+	// Init Redis
+	config.InitRedis()
 
 	// Inisialisasi Gin router
 	router := gin.Default()
