@@ -63,32 +63,32 @@ func SaveGroupMessage(senderID int, groupID int, content string) error {
 	}
 	log.Println("Transaksi dimulai")
 
-	messageID, err := insertGroupMessage(tx, senderID, content, groupID)
+	messageID, err := InsertGroupMessage(tx, senderID, content, groupID)
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	receiverIDs, err := getGroupMemberIDs(tx, groupID, senderID)
+	receiverIDs, err := GetGroupMemberIDs(tx, groupID, senderID)
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	success := insertMessageReceivers(tx, messageID, receiverIDs)
+	if err := InsertMessageReceivers(tx, messageID, receiverIDs); err != nil {
+		tx.Rollback()
+		return err
+	}
 
 	if err := tx.Commit(); err != nil {
 		log.Println("Gagal commit transaksi:", err)
 		return err
 	}
 
-	if !success {
-		log.Println("Transaksi berhasil tapi beberapa receiver gagal disisipkan")
-	}
 	return nil
 }
 
-func insertGroupMessage(tx *sql.Tx, senderID int, content string, groupID int) (int, error) {
+func InsertGroupMessage(tx *sql.Tx, senderID int, content string, groupID int) (int, error) {
 	log.Println("Menyisipkan pesan ke tabel group_messages")
 	result, err := tx.Exec("INSERT INTO group_messages (sender_id, content, group_id) VALUES (?, ?, ?)", senderID, content, groupID)
 	if err != nil {
@@ -105,7 +105,7 @@ func insertGroupMessage(tx *sql.Tx, senderID int, content string, groupID int) (
 	return int(lastID), nil
 }
 
-func getGroupMemberIDs(tx *sql.Tx, groupID int, excludeSenderID int) ([]int, error) {
+func GetGroupMemberIDs(tx *sql.Tx, groupID int, excludeSenderID int) ([]int, error) {
 	log.Printf("Mengambil anggota group_id: %d", groupID)
 	rows, err := tx.Query("SELECT user_id FROM group_members WHERE group_id = ?", groupID)
 	if err != nil {
@@ -132,17 +132,16 @@ func getGroupMemberIDs(tx *sql.Tx, groupID int, excludeSenderID int) ([]int, err
 	return ids, nil
 }
 
-func insertMessageReceivers(tx *sql.Tx, messageID int, receiverIDs []int) bool {
-	success := true
+func InsertMessageReceivers(tx *sql.Tx, messageID int, receiverIDs []int) error {
 	for _, receiverID := range receiverIDs {
 		log.Printf("Menyisipkan receiver_id: %d ke message_receivers", receiverID)
 		_, err := tx.Exec("INSERT INTO message_receivers (message_id, receiver_id) VALUES (?, ?)", messageID, receiverID)
 		if err != nil {
 			log.Printf("Gagal menyisipkan receiver_id %d: %v", receiverID, err)
-			success = false
+			return nil
 		}
 	}
-	return success
+	return nil
 }
 
 func GetGroupMessages(group int) ([]dto.GetGroupMessage, error) {
