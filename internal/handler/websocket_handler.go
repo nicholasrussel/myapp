@@ -63,23 +63,20 @@ func WebSocketHandler(c *gin.Context) {
 }
 
 func handleMessage(msg dto.Message) {
-	if msg.GroupID > 0 {
-		handleGroupMessage(msg)
-	} else {
-		handlePersonalMessage(msg)
-	}
-}
-
-func handleGroupMessage(msg dto.Message) {
-	err := service.SaveGroupMessage(msg.SenderID, msg.GroupID, msg.Content)
-	if err != nil {
-		log.Printf("Failed to save group message: %v", err)
+	if *msg.ChatRoomID == 0 {
+		log.Println("chat_room_id tidak boleh kosong")
 		return
 	}
 
-	memberIDs, err := service.GetGroupMembers(msg.GroupID)
+	err := service.SaveMessage(msg.SenderID, *msg.ChatRoomID, msg.Content)
 	if err != nil {
-		log.Printf("Failed to get group members: %v", err)
+		log.Printf("Failed to save message: %v", err)
+		return
+	}
+
+	memberIDs, err := service.GetChatRoomMemberIDs(*msg.ChatRoomID)
+	if err != nil {
+		log.Printf("Failed to get chat room members: %v", err)
 		return
 	}
 
@@ -88,15 +85,6 @@ func handleGroupMessage(msg dto.Message) {
 			sendToClient(uid, msg)
 		}
 	}
-}
-
-func handlePersonalMessage(msg dto.Message) {
-	err := service.SaveMessage(msg.SenderID, msg.ReceiverID, msg.Content)
-	if err != nil {
-		log.Printf("Failed to save personal message: %v", err)
-		return
-	}
-	sendToClient(msg.ReceiverID, msg)
 }
 
 func sendToClient(userID int, msg dto.Message) {

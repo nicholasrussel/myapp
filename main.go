@@ -34,7 +34,6 @@ func main() {
 	router := gin.Default()
 	router.StaticFile("/", "index.html")
 
-	// Routes
 	log.Println("Mendaftarkan endpoint /login")
 
 	router.POST("/login", service.RateLimitLoginMiddleware(), handler.LoginHandler)
@@ -53,9 +52,16 @@ func main() {
 
 	router.POST("/messages", handler.SendMessageHandler)
 	router.GET("/messages", handler.GetMessagesHandler)
-	router.GET("/group-messages", handler.GetGroupMessagesHandler)
+	router.GET("/chatroom", handler.CreateOrFindChatRoomHandler)
 
 	router.POST("/create-group", handler.CreateGroupHandler)
+
+	router.POST("/friend/request", handler.SendFriendRequestHandler)
+	router.GET("/friend/requests", handler.GetFriendRequestsHandler)
+	router.POST("/friend/action", handler.ActionFriendRequestsHandler)
+	router.POST("/friend/block", handler.BlockFriendHandler)
+	router.DELETE("/friend/delete", handler.DeleteFriendHandler)
+
 
 	// Jalankan server
 	svrPort := config.LoadEnv("SVR_PORT")

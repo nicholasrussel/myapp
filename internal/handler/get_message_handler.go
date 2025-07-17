@@ -10,21 +10,14 @@ import (
 )
 
 func GetMessagesHandler(c *gin.Context) {
-	user1Str := c.Query("user1")
-	user2Str := c.Query("user2")
-
-	user1, err := strconv.Atoi(user1Str)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user1 parameter"})
-		return
-	}
-	user2, err := strconv.Atoi(user2Str)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user2 parameter"})
+	roomIDStr := c.Query("chat_room_id")
+	roomID, err := strconv.Atoi(roomIDStr)
+	if err != nil || roomID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat_room_id parameter"})
 		return
 	}
 
-	messages, err := service.GetMessagesBetweenUsers(user1, user2)
+	messages, err := service.GetMessagesByChatRoom(roomID)
 	if err != nil {
 		log.Println("DB error:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get messages"})
@@ -34,22 +27,3 @@ func GetMessagesHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, messages)
 }
 
-func GetGroupMessagesHandler(c *gin.Context) {
-	groupStr := c.Query("group")
-
-	group, err := strconv.Atoi(groupStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user1 parameter"})
-		return
-	}
-
-
-	messages, err := service.GetGroupMessages(group)
-	if err != nil {
-		log.Println("DB error:", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get messages"})
-		return
-	}
-
-	c.JSON(http.StatusOK, messages)
-}

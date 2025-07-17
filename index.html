@@ -1,131 +1,138 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Simple Chat</title>
+  <title>Simple WebSocket Chat</title>
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    input, select, button { margin: 5px; padding: 5px; }
+    #chatBox { border: 1px solid #ccc; padding: 10px; height: 250px; overflow-y: scroll; background: #f9f9f9; }
+    .section { margin-bottom: 20px; }
+  </style>
 </head>
 <body>
+
   <h2>Simple WebSocket Chat</h2>
-  <div>
-    <label>Your User ID: <input type="text" id="userID" /></label>
+
+  <div class="section">
+    <label>Your User ID: <input type="number" id="userID" /></label>
     <button onclick="connect()">Connect</button>
   </div>
 
-  <div style="margin-top: 20px;">
-    <label>To User ID: <input type="text" id="receiverID" onchange="loadMessages()" /></label><br>
-    <label>To Group ID: <input type="text" id="groupID" onchange="loadGroupMessages()" /></label><br>
+  <div class="section">
+    <h3>Mode</h3>
+    <select id="chatMode" onchange="updateMode()">
+      <option value="personal">1-on-1 Chat</option>
+      <option value="group">Group Chat</option>
+    </select>
+  </div>
+
+  <div class="section" id="personalMode">
+    <h4>1-on-1 Chat</h4>
+    <label>Receiver ID: <input type="number" id="receiverID" /></label>
+    <button onclick="getOrCreateRoom()">Get/Create Room</button>
+  </div>
+
+  <div class="section" id="groupMode" style="display: none;">
+    <h4>Group Chat</h4>
+    <label>Group Chat Room ID: <input type="number" id="chatRoomIDGroup" onchange="loadMessages()" /></label>
+  </div>
+
+  <div class="section">
     <label>Message: <input type="text" id="message" /></label>
     <button onclick="sendMessage()">Send</button>
   </div>
 
-  <div style="margin-top: 20px;">
+  <div class="section">
     <h3>Messages:</h3>
-    <div id="chatBox" style="border:1px solid #ccc; padding:10px; height:200px; overflow:auto;"></div>
+    <div id="chatBox"></div>
   </div>
 
   <script>
     let socket = null;
     let userID = null;
+    let currentRoomID = null;
 
     function connect() {
-      userID = document.getElementById("userID").value;
+      userID = parseInt(document.getElementById("userID").value);
       if (!userID) return alert("Enter your User ID");
 
       socket = new WebSocket(`ws://localhost:8080/ws?user_id=${userID}`);
 
-      socket.onopen = () => {
-        logMessage("Connected as User ID " + userID);
-      };
-
+      socket.onopen = () => logMessage("✅ Connected as User ID " + userID);
       socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        let prefix = "";
-
-        if (data.group_id) {
-          prefix = `Group ${data.group_id} - `;
-        } else {
-          prefix = data.sender_id === parseInt(userID) ? "You" : `From ${data.sender_id}`;
-        }
-
-        logMessage(`${prefix}: ${data.content}`);
+        const sender = data.sender_id === userID ? "You" : `From ${data.sender_id}`;
+        logMessage(`${sender}: ${data.content}`);
       };
+      socket.onclose = () => logMessage("🔌 Disconnected.");
+      socket.onerror = (err) => console.error("WebSocket error:", err);
+    }
 
+    function updateMode() {
+      const mode = document.getElementById("chatMode").value;
+      document.getElementById("personalMode").style.display = mode === "personal" ? "block" : "none";
+      document.getElementById("groupMode").style.display = mode === "group" ? "block" : "none";
+      currentRoomID = null;
+      document.getElementById("chatBox").innerHTML = "";
+    }
 
-      socket.onclose = () => {
-        logMessage("Disconnected.");
-      };
+    function getOrCreateRoom() {
+      const receiverID = parseInt(document.getElementById("receiverID").value);
+      if (!receiverID || !userID) return alert("User ID and Receiver ID are required");
 
-      socket.onerror = (err) => {
-        console.error("WebSocket error:", err);
-      };
+      fetch(`http://localhost:8080/chatroom?user1=${userID}&user2=${receiverID}`)
+        .then(res => res.json())
+        .then(data => {
+          currentRoomID = data.chat_room_id;
+          logMessage("💬 Room ID " + currentRoomID + " loaded.");
+          loadMessages();
+        })
+        .catch(err => {
+          console.error(err);
+          alert("Failed to get/create chat room");
+        });
     }
 
     function sendMessage() {
-      const receiverID = document.getElementById("receiverID").value;
-      const groupID = document.getElementById("groupID").value;
+      const mode = document.getElementById("chatMode").value;
       const message = document.getElementById("message").value;
+      const groupRoomID = parseInt(document.getElementById("chatRoomIDGroup").value);
 
-      if (!message) return alert("Message is required");
+      if (!message) return alert("Message cannot be empty");
+
+      const chatRoomID = mode === "personal" ? currentRoomID : groupRoomID;
+      if (!chatRoomID) return alert("Chat room ID is not set");
 
       const payload = {
-        sender_id: parseInt(userID),
+        sender_id: userID,
+        chat_room_id: chatRoomID,
         content: message
       };
 
-      if (groupID) {
-        payload.group_id = parseInt(groupID);
-        logMessage(`You to Group ${groupID}: ${message}`);
-      } else if (receiverID) {
-        payload.receiver_id = parseInt(receiverID);
-        logMessage(`You to ${receiverID}: ${message}`);
-      } else {
-        return alert("Provide either Receiver ID or Group ID");
-      }
-
       socket.send(JSON.stringify(payload));
+      logMessage(`You: ${message}`);
       document.getElementById("message").value = "";
     }
 
-
     function loadMessages() {
-      const user1 = userID;
-      const user2 = document.getElementById("receiverID").value;
-      if (!user1 || !user2) return;
+      const chatRoomID = document.getElementById("chatMode").value === "personal"
+        ? currentRoomID
+        : parseInt(document.getElementById("chatRoomIDGroup").value);
 
-      fetch(`http://localhost:8080/messages?user1=${user1}&user2=${user2}`)
+      if (!chatRoomID) return;
+
+      fetch(`http://localhost:8080/messages?chat_room_id=${chatRoomID}`)
         .then(res => res.json())
         .then(messages => {
           const box = document.getElementById("chatBox");
           box.innerHTML = "";
           messages.forEach(msg => {
-            const sender = msg.sender_id === parseInt(userID) ? "You" : `From ${msg.sender_id}`;
+            const sender = msg.sender_id === userID ? "You" : `From ${msg.sender_id}`;
             box.innerHTML += `<div>${sender}: ${msg.content}</div>`;
           });
           box.scrollTop = box.scrollHeight;
         })
-        .catch(err => {
-          console.error("Failed to load messages:", err);
-        });
-    }
-
-    function loadGroupMessages() {
-      const user1 = userID;
-      const group = document.getElementById("groupID").value;
-      if (!group) return;
-
-      fetch(`http://localhost:8080/group-messages?group=${group}`)
-        .then(res => res.json())
-        .then(messages => {
-          const box = document.getElementById("chatBox");
-          box.innerHTML = "";
-          messages.forEach(msg => {
-            const sender = msg.sender_id === parseInt(userID) ? "You" : `From ${msg.sender_id}`;
-            box.innerHTML += `<div>${sender}: ${msg.content}</div>`;
-          });
-          box.scrollTop = box.scrollHeight;
-        })
-        .catch(err => {
-          console.error("Failed to load messages:", err);
-        });
+        .catch(err => console.error("Failed to load messages:", err));
     }
 
     function logMessage(msg) {
