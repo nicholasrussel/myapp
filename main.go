@@ -61,7 +61,7 @@ func main() {
 	router.POST("/friend/action", handler.ActionFriendRequestsHandler)
 	router.POST("/friend/block", handler.BlockFriendHandler)
 	router.DELETE("/friend/delete", handler.DeleteFriendHandler)
-
+	router.GET("/friend/friend-list", handler.GetFriendListHandler)
 
 	// Jalankan server
 	svrPort := config.LoadEnv("SVR_PORT")

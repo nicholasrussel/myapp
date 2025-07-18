@@ -144,4 +144,46 @@ func DeleteFriend(userID, friendID int) error {
 	return tx.Commit()
 }
 
+func GetFriendList(userID int) ([]map[string]interface{}, error) {
+	rows, err := config.DB.Query(`
+		SELECT 
+			CASE 
+				WHEN f.user1_id = ? THEN f.user2_id
+				ELSE f.user1_id
+			END AS friend_id,
+			u.username,
+			f.created_at
+		FROM friends f
+		JOIN users u ON u.id = CASE 
+			WHEN f.user1_id = ? THEN f.user2_id
+			ELSE f.user1_id
+		END
+		WHERE (f.user1_id = ? OR f.user2_id = ?)
+		AND (f.is_blocked_by IS NULL OR f.is_blocked_by != ?)
+	`, userID, userID, userID, userID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []map[string]interface{}
+	for rows.Next() {
+		var user2ID int
+		var username string
+		var createdAt string
+
+		err := rows.Scan(&user2ID, &username, &createdAt)
+		if err != nil {
+			return nil, err
+		}
+
+		results = append(results, map[string]interface{}{
+			"user_id":       user2ID,
+			"username":      username,
+			"created_at":    createdAt,
+		})
+	}
+
+	return results, nil
+}
 

@@ -19,6 +19,12 @@
   </div>
 
   <div class="section">
+    <h3>Friend List</h3>
+    <button onclick="getFriendList()">Load Friend List</button>
+    <ul id="friendList"></ul>
+  </div>
+
+  <div class="section">
     <h3>Mode</h3>
     <select id="chatMode" onchange="updateMode()">
       <option value="personal">1-on-1 Chat</option>
@@ -139,6 +145,32 @@
       const box = document.getElementById("chatBox");
       box.innerHTML += `<div>${msg}</div>`;
       box.scrollTop = box.scrollHeight;
+    }
+
+    async function getFriendList() {
+      const userID = document.getElementById("userID").value;
+
+      console.log("User ID:", userID);
+      if (!userID) {
+        alert("Please connect first (enter user ID)");
+        return;
+      }
+
+      const response = await fetch(`/friend/friend-list?user_id=${userID}`);
+      const data = await response.json();
+
+      const list = document.getElementById("friendList");
+      list.innerHTML = "";
+
+      if (data.friends && data.friends.length > 0) {
+        data.friends.forEach(friend => {
+          const li = document.createElement("li");
+          li.textContent = friend.username;
+          list.appendChild(li);
+        });
+      } else {
+        list.innerHTML = "<li>No friends found.</li>";
+      }
     }
   </script>
 </body>

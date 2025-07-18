@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -104,3 +105,24 @@ func DeleteFriendHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Friend deleted successfully"})
 }
+
+func GetFriendListHandler(c *gin.Context) {
+
+	userIDStr := c.Query("user_id")
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user_id"})
+		return
+	}
+
+	friendList, err := service.GetFriendList(userID)
+
+	if err != nil {
+		log.Printf("Error in GetFriendList: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get friend list"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"friends": friendList})
+}
+
