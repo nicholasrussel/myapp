@@ -1,6 +1,6 @@
 Simple backend API untuk aplikasi chat real-time menggunakan Golang, Gin, dan WebSocket, dilengkapi dengan autentikasi JWT, serta fitur sosial seperti friend system dan group chat.
 
-📌 Features
+📌 Features /n
 🔐 Authentication (JWT)
 💬 Real-time chat menggunakan WebSocket
 👥 Add / Delete Friend
